@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Run from anywhere: cd into script directory first.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+SHIM_SERVER_ID="${SHIM_SERVER_ID:-1}"
+SHIM_SERVER_ADDRESS="${SHIM_SERVER_ADDRESS:-127.0.0.1:8001}"
+SHIM_BIND_ADDRESS="${SHIM_BIND_ADDRESS:-127.0.0.1:3000}"
+SHIM_TIMEOUT_MS="${SHIM_TIMEOUT_MS:-3000}"
+RUST_LOG="${RUST_LOG:-info}"
+
+echo "Starting shim on ${SHIM_BIND_ADDRESS}, forwarding to ${SHIM_SERVER_ADDRESS} (server ${SHIM_SERVER_ID})"
+RUST_LOG="$RUST_LOG" \
+SHIM_SERVER_ID="$SHIM_SERVER_ID" \
+SHIM_SERVER_ADDRESS="$SHIM_SERVER_ADDRESS" \
+SHIM_BIND_ADDRESS="$SHIM_BIND_ADDRESS" \
+SHIM_TIMEOUT_MS="$SHIM_TIMEOUT_MS" \
+cargo run --bin shim

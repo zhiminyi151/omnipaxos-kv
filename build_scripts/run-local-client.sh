@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Run from project root: script cd's into build_scripts for config paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 client1_id=1
 client2_id=2
 rust_log="debug"

@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Run from project root: script cd's into build_scripts for config paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 usage="Usage: run-local-cluster.sh"
 cluster_size=3
 rust_log="info"

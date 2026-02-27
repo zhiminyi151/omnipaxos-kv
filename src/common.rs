@@ -28,6 +28,8 @@ pub mod messages {
     pub enum ServerMessage {
         Write(CommandId),
         Read(CommandId, Option<String>),
+        CasOk(CommandId),
+        CasFail(CommandId),
         StartSignal(Timestamp),
     }
 
@@ -36,6 +38,8 @@ pub mod messages {
             match self {
                 ServerMessage::Write(id) => *id,
                 ServerMessage::Read(id, _) => *id,
+                ServerMessage::CasOk(id) => *id,
+                ServerMessage::CasFail(id) => *id,
                 ServerMessage::StartSignal(_) => unimplemented!(),
             }
         }
@@ -65,6 +69,7 @@ pub mod kv {
         Put(String, String),
         Delete(String),
         Get(String),
+        Cas(String, String, String),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -89,6 +94,11 @@ pub mod kv {
                         }
                     }
                     KVCommand::Get(_) => (),
+                    KVCommand::Cas(key, from, to) => {
+                        if snapshotted.get(key).is_some_and(|v| v == from) {
+                            snapshotted.insert(key.clone(), to.clone());
+                        }
+                    }
                 }
             }
             // remove keys that were put back

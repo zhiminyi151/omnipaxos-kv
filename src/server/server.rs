@@ -1,4 +1,8 @@
-use crate::{configs::OmniPaxosKVConfig, database::Database, network::Network};
+use crate::{
+    configs::OmniPaxosKVConfig,
+    database::{CommandResult, Database},
+    network::Network,
+};
 use chrono::Utc;
 use log::*;
 use omnipaxos::{
@@ -135,11 +139,13 @@ impl OmniPaxosServer {
     fn update_database_and_respond(&mut self, commands: Vec<Command>) {
         // TODO: batching responses possible here (batch at handle_cluster_messages)
         for command in commands {
-            let read = self.database.handle_command(command.kv_cmd);
+            let result = self.database.handle_command(command.kv_cmd);
             if command.coordinator_id == self.id {
-                let response = match read {
-                    Some(read_result) => ServerMessage::Read(command.id, read_result),
-                    None => ServerMessage::Write(command.id),
+                let response = match result {
+                    CommandResult::Write => ServerMessage::Write(command.id),
+                    CommandResult::Read(read_result) => ServerMessage::Read(command.id, read_result),
+                    CommandResult::Cas(true) => ServerMessage::CasOk(command.id),
+                    CommandResult::Cas(false) => ServerMessage::CasFail(command.id),
                 };
                 self.network.send_to_client(command.client_id, response);
             }

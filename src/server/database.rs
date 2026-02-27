@@ -1,6 +1,12 @@
 use omnipaxos_kv::common::kv::KVCommand;
 use std::collections::HashMap;
 
+pub enum CommandResult {
+    Write,
+    Read(Option<String>),
+    Cas(bool),
+}
+
 pub struct Database {
     db: HashMap<String, String>,
 }
@@ -10,17 +16,24 @@ impl Database {
         Self { db: HashMap::new() }
     }
 
-    pub fn handle_command(&mut self, command: KVCommand) -> Option<Option<String>> {
+    pub fn handle_command(&mut self, command: KVCommand) -> CommandResult {
         match command {
             KVCommand::Put(key, value) => {
                 self.db.insert(key, value);
-                None
+                CommandResult::Write
             }
             KVCommand::Delete(key) => {
                 self.db.remove(&key);
-                None
+                CommandResult::Write
             }
-            KVCommand::Get(key) => Some(self.db.get(&key).map(|v| v.clone())),
+            KVCommand::Get(key) => CommandResult::Read(self.db.get(&key).cloned()),
+            KVCommand::Cas(key, from, to) => {
+                let applied = self.db.get(&key).is_some_and(|curr| curr == &from);
+                if applied {
+                    self.db.insert(key, to);
+                }
+                CommandResult::Cas(applied)
+            }
         }
     }
 }
