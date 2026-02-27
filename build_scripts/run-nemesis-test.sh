@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/docker-compose-nemesis.yml}"
 NEMESIS_MODE="${NEMESIS_MODE:-mixed}" # partition | crash | mixed
 PARTITION_MODE="${PARTITION_MODE:-random-halves}"
+CRASH_TARGET="${CRASH_TARGET:-random}" # random | s1 | s2 | s3
 NEMESIS_INTERVAL="${NEMESIS_INTERVAL:-8}"
 FAULT_DURATION="${FAULT_DURATION:-6}"
 BOOT_WAIT_SECS="${BOOT_WAIT_SECS:-8}"
@@ -45,7 +46,7 @@ run_nemesis_loop() {
         "$SCRIPT_DIR/nemesis.sh" partition-stop
         ;;
       crash)
-        "$SCRIPT_DIR/nemesis.sh" crash random
+        "$SCRIPT_DIR/nemesis.sh" crash "$CRASH_TARGET"
         sleep "$FAULT_DURATION"
         "$SCRIPT_DIR/nemesis.sh" resume
         ;;
