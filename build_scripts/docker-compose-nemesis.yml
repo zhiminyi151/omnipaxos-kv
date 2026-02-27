@@ -1,0 +1,58 @@
+x-common-server-variables: &common-server-variables
+  RUST_LOG: "debug"
+  SERVER_CONFIG_FILE: "/app/server-config.toml"
+  CLUSTER_CONFIG_FILE: "/app/cluster-config.toml"
+  OMNIPAXOS_NODE_ADDRS: "s1:8000,s2:8000,s3:8000"
+  OMNIPAXOS_LISTEN_ADDRESS: "0.0.0.0"
+  OMNIPAXOS_LISTEN_PORT: 8000
+
+services:
+  s1:
+    image: omnipaxos-server
+    build:
+      context: ./..
+      dockerfile: server.dockerfile
+    container_name: s1
+    environment:
+      <<: *common-server-variables
+    volumes:
+      - ./server-1-shim-config.toml:/app/server-config.toml
+      - ./cluster-config.toml:/app/cluster-config.toml
+      - ./logs/:/app/logs/
+
+  s2:
+    image: omnipaxos-server
+    container_name: s2
+    environment:
+      <<: *common-server-variables
+    volumes:
+      - ./server-2-shim-config.toml:/app/server-config.toml
+      - ./cluster-config.toml:/app/cluster-config.toml
+      - ./logs/:/app/logs/
+
+  s3:
+    image: omnipaxos-server
+    container_name: s3
+    environment:
+      <<: *common-server-variables
+    volumes:
+      - ./server-3-shim-config.toml:/app/server-config.toml
+      - ./cluster-config.toml:/app/cluster-config.toml
+      - ./logs/:/app/logs/
+
+  shim:
+    image: omnipaxos-shim
+    build:
+      context: ./..
+      dockerfile: shim.dockerfile
+    container_name: shim
+    environment:
+      RUST_LOG: "info"
+      SHIM_SERVER_ID: "1"
+      SHIM_SERVER_ADDRESS: "s1:8000"
+      SHIM_BIND_ADDRESS: "0.0.0.0:3000"
+      SHIM_TIMEOUT_MS: "4000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - s1
