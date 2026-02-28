@@ -5,6 +5,7 @@ x-common-server-variables: &common-server-variables
   OMNIPAXOS_NODE_ADDRS: "s1:8000,s2:8000,s3:8000"
   OMNIPAXOS_LISTEN_ADDRESS: "0.0.0.0"
   OMNIPAXOS_LISTEN_PORT: 8000
+  OMNIPAXOS_STORAGE_PATH: "/data/omnipaxos"
 
 services:
   s1:
@@ -19,6 +20,7 @@ services:
       - ./server-1-shim-config.toml:/app/server-config.toml
       - ./cluster-config.toml:/app/cluster-config.toml
       - ./logs/:/app/logs/
+      - s1-data:/data
 
   s2:
     image: omnipaxos-server
@@ -29,6 +31,7 @@ services:
       - ./server-2-shim-config.toml:/app/server-config.toml
       - ./cluster-config.toml:/app/cluster-config.toml
       - ./logs/:/app/logs/
+      - s2-data:/data
 
   s3:
     image: omnipaxos-server
@@ -39,6 +42,7 @@ services:
       - ./server-3-shim-config.toml:/app/server-config.toml
       - ./cluster-config.toml:/app/cluster-config.toml
       - ./logs/:/app/logs/
+      - s3-data:/data
 
   shim:
     image: omnipaxos-shim
@@ -56,3 +60,8 @@ services:
       - "3000:3000"
     depends_on:
       - s1
+
+volumes:
+  s1-data:
+  s2-data:
+  s3-data:

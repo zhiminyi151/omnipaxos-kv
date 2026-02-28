@@ -19,7 +19,9 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use crate::configs::OmniPaxosKVConfig;
 
 pub struct Network {
+    id: NodeId,
     peers: Vec<NodeId>,
+    peer_addresses: HashMap<NodeId, SocketAddr>,
     peer_connections: Vec<Option<PeerConnection>>,
     client_connections: HashMap<ClientId, ClientConnection>,
     max_client_id: Arc<Mutex<ClientId>>,
@@ -68,7 +70,12 @@ impl Network {
         let (cluster_message_sender, cluster_messages) = tokio::sync::mpsc::channel(batch_size);
         let (client_message_sender, client_messages) = tokio::sync::mpsc::channel(batch_size);
         let mut network = Self {
+            id,
             peers: peer_addresses.iter().map(|(id, _)| *id).collect(),
+            peer_addresses: peer_addresses
+                .iter()
+                .map(|(peer_id, addr)| (*peer_id, *addr))
+                .collect(),
             peer_connections: cluster_connections,
             client_connections: HashMap::new(),
             max_client_id: Arc::new(Mutex::new(0)),
@@ -83,6 +90,54 @@ impl Network {
             .initialize_connections(id, num_clients, peer_addresses, listen_address)
             .await;
         network
+    }
+
+    // Re-establishes missing outgoing peer links after crashes/restarts.
+    // In this topology, node X only opens outbound links to peers with id < X.
+    pub async fn try_reconnect_peers(&mut self) {
+        for (idx, peer_id) in self.peers.iter().copied().enumerate() {
+            if self.peer_connections[idx].is_some() {
+                continue;
+            }
+            if peer_id >= self.id {
+                continue;
+            }
+
+            let Some(peer_address) = self.peer_addresses.get(&peer_id).copied() else {
+                continue;
+            };
+
+            let maybe_connection = tokio::time::timeout(
+                Duration::from_millis(200),
+                TcpStream::connect(peer_address),
+            )
+            .await;
+            let Ok(Ok(connection)) = maybe_connection else {
+                continue;
+            };
+
+            if let Err(err) = connection.set_nodelay(true) {
+                warn!("Couldn't set nodelay for peer {peer_id}: {err}");
+                continue;
+            }
+
+            let mut registration_connection = frame_registration_connection(connection);
+            let handshake = RegistrationMessage::NodeRegister(self.id);
+            if let Err(err) = registration_connection.send(handshake).await {
+                warn!("Reconnect handshake to node {peer_id} failed: {err}");
+                continue;
+            }
+
+            let underlying_stream = registration_connection.into_inner().into_inner();
+            let peer_actor = PeerConnection::new(
+                peer_id,
+                underlying_stream,
+                self.batch_size,
+                self.cluster_message_sender.clone(),
+            );
+            self.peer_connections[idx] = Some(peer_actor);
+            info!("Reconnected to node {peer_id}");
+        }
     }
 
     async fn initialize_connections(

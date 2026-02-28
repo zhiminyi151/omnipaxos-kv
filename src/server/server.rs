@@ -11,10 +11,10 @@ use omnipaxos::{
     OmniPaxos, OmniPaxosConfig,
 };
 use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
-use omnipaxos_storage::memory_storage::MemoryStorage;
-use std::{fs::File, io::Write, time::Duration};
+use omnipaxos_storage::persistent_storage::{PersistentStorage, PersistentStorageConfig};
+use std::{env, fs::File, io::Write, time::Duration};
 
-type OmniPaxosInstance = OmniPaxos<Command, MemoryStorage<Command>>;
+type OmniPaxosInstance = OmniPaxos<Command, PersistentStorage<Command>>;
 const NETWORK_BATCH_SIZE: usize = 100;
 const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
@@ -33,7 +33,13 @@ pub struct OmniPaxosServer {
 impl OmniPaxosServer {
     pub async fn new(config: OmniPaxosKVConfig) -> Self {
         // Initialize OmniPaxos instance
-        let storage: MemoryStorage<Command> = MemoryStorage::default();
+        let storage_path = storage_path(config.local.server_id);
+        info!(
+            "{}: opening persistent storage at {}",
+            config.local.server_id, storage_path
+        );
+        let storage_config = PersistentStorageConfig::with_path(storage_path);
+        let storage = PersistentStorage::<Command>::open(storage_config);
         let omnipaxos_config: OmniPaxosConfig = config.clone().into();
         let omnipaxos_msg_buffer = Vec::with_capacity(omnipaxos_config.server_config.buffer_size);
         let omnipaxos = omnipaxos_config.build(storage).unwrap();
@@ -65,6 +71,7 @@ impl OmniPaxosServer {
             tokio::select! {
                 _ = election_interval.tick() => {
                     self.omnipaxos.tick();
+                    self.network.try_reconnect_peers().await;
                     self.send_outgoing_msgs();
                 },
                 _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
@@ -231,4 +238,9 @@ impl OmniPaxosServer {
         output_file.flush()?;
         Ok(())
     }
+}
+
+fn storage_path(server_id: NodeId) -> String {
+    let base_path = env::var("OMNIPAXOS_STORAGE_PATH").unwrap_or_else(|_| "/tmp/omnipaxos".to_string());
+    format!("{base_path}/server-{server_id}")
 }

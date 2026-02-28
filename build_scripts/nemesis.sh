@@ -57,6 +57,17 @@ ensure_container_exists() {
   fi
 }
 
+restart_shim_if_needed() {
+  local resumed_node="$1"
+  if [[ "$resumed_node" != "$LEADER_CONTAINER" ]]; then
+    return 0
+  fi
+  if docker inspect shim >/dev/null 2>&1; then
+    docker restart shim >/dev/null
+    echo "resume: restarted shim after leader recovery"
+  fi
+}
+
 cmd="${1:-status}"
 arg="${2:-}"
 network="$(resolve_network)"
@@ -114,6 +125,12 @@ case "$cmd" in
     target="${arg:-random}"
     if [[ "$target" == "random" ]]; then
       target="$(pick_random_server)"
+    elif [[ "$target" == "leader" ]]; then
+      target="$LEADER_CONTAINER"
+    elif [[ "$target" != "s1" && "$target" != "s2" && "$target" != "s3" ]]; then
+      echo "Unknown crash target: $target" >&2
+      echo "Use: random | leader | s1 | s2 | s3" >&2
+      exit 1
     fi
 
     CRASHED_NODE="$target"
@@ -130,6 +147,7 @@ case "$cmd" in
 
     docker start "$CRASHED_NODE" >/dev/null
     echo "resume: started $CRASHED_NODE"
+    restart_shim_if_needed "$CRASHED_NODE"
     CRASHED_NODE=""
     save_state
     ;;
@@ -153,7 +171,7 @@ Usage:
   $0 status
   $0 partition-start [random-halves|isolate-leader|majority-minority]
   $0 partition-stop
-  $0 crash [random|s1|s2|s3]
+  $0 crash [random|leader|s1|s2|s3]
   $0 resume
   $0 clear
 EOF
