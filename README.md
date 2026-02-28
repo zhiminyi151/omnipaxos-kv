@@ -73,7 +73,7 @@ The Dockerfiles already install required native dependencies for RocksDB/bindgen
 
 ---
 
-## Quick Start
+<!-- ## Quick Start
 
 ### 1) Baseline (No Faults)
 
@@ -142,7 +142,7 @@ You can also test follower recovery:
 CRASH_TARGET=s2 ./build_scripts/verify-recovery.sh
 ```
 
----
+--- -->
 
 ## Step-by-Step Validation Guide
 
